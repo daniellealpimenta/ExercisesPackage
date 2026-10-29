@@ -1,34 +1,50 @@
-# 🏋️‍♀️ ExercisesPackage
+<div align="center">
 
-Um Swift Package poderoso e flexível para rastrear e contabilizar exercícios físicos de forma autônoma utilizando os sensores de movimento (acelerômetro, giroscópio) do Apple Watch ou iPhone. Construído seguindo o **Padrão Strategy** e os princípios **SOLID**, este pacote encapsula a lógica pesada e heurística do `CMMotionManager`, oferecendo uma interface limpa e reativa para o desenvolvedor.
+# 🏋️ ExercisesPackage
+
+**Conta repetições de exercício pelos sensores do Apple Watch ou do iPhone.**
+
+Swift Package que transforma os dados do acelerômetro e do giroscópio (`CMMotionManager`) em
+repetições de flexão, abdominal e agachamento, com uma API reativa pronta para SwiftUI.
+
+![Swift](https://img.shields.io/badge/Swift-6.2-F05138?logo=swift&logoColor=white)
+![SPM](https://img.shields.io/badge/SPM-1.0.0-F05138?logo=swift&logoColor=white)
+![Plataformas](https://img.shields.io/badge/iOS%2016%20%C2%B7%20watchOS%209%20%C2%B7%20macOS%2013-000000?logo=apple&logoColor=white)
+![Core Motion](https://img.shields.io/badge/Core%20Motion-000000?logo=apple&logoColor=white)
+![Licença](https://img.shields.io/badge/licen%C3%A7a-MIT-green)
+
+</div>
+
+> [!NOTE]
+> Em uso no [**WatchSport**](https://github.com/daniellealpimenta/WatchSport), app de missões
+> diárias de treino para Apple Watch.
 
 ---
 
-## 🚀 Funcionalidades
+## ✨ Exercícios suportados
 
-O `ExercisesPackage` abstrai a captura de movimentos de exercícios complexos, reconhecendo de forma nativa e matemática quando uma repetição foi concluída. Os seguintes exercícios são suportados:
+| Exercício | Como a repetição é detectada |
+|---|---|
+| 🤸 **Flexão** (`.pushUp`) | Variação de *pitch* na atitude do aparelho, com *debounce* de 0,8 s para validar subida e descida completas |
+| 🧘 **Abdominal** (`.sitUp`) | Vetor de gravidade mede a inclinação do tronco: 45° na subida e 20° na descida |
+| 🦵 **Agachamento** (`.squat`) | Aceleração vertical contra a gravidade, com limites (*thresholds*) para subida e descida |
+| 💪 **Barra** (`.pullUp`) | Manual (`increment()` / `decrement()`): o pulso não dá sinal confiável nesse movimento |
 
-- **💪 Barra (Pull-Up):** Modo de controle manual (incremento e decremento simples).
-- **🧘‍♀️ Abdominal (Sit-Up):** Usa o vetor de gravidade para analisar a inclinação do tronco, validando rotações (45° de subida e 20° de descida).
-- **🦵 Agachamento (Squat):** Calcula a aceleração vertical contra a gravidade para deduzir a velocidade de impacto na subida e descida, através de limites (*thresholds*) dinâmicos.
-- **🤸‍♀️ Flexão (Push-Up):** Monitora as variações de _Pitch_ no _Attitude_ do dispositivo, aplicando filtro *debounce* (0.8s) para validar subidas e descidas completas do corpo.
+## 📦 Instalação
 
----
-
-## 🛠 Instalação
-
-Adicione o pacote ao seu projeto Xcode ou através do `Package.swift`:
+No Xcode: *File → Add Package Dependencies…* e cole a URL do repositório. Ou no `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/SEU_USUARIO/ExercisesPackage.git", from: "1.0.0")
+    .package(url: "https://github.com/daniellealpimenta/ExercisesPackage.git", from: "1.0.0")
 ]
 ```
-> **Nota:** Certifique-se de adicionar as chaves e permissões de privacidade no arquivo `Info.plist` do seu projeto para acessar os sensores de movimento (como `NSMotionUsageDescription`).
 
----
+> [!IMPORTANT]
+> Adicione `NSMotionUsageDescription` ao `Info.plist` do app, explicando por que ele usa os
+> sensores de movimento.
 
-## 💻 Como Usar
+## 💻 Como usar
 
 O pacote foi desenhado para ser integrado de forma transparente com **SwiftUI** e **Combine**. O ponto de acesso principal é o `ExerciseTracker`, que já adota o protocolo `@ObservableObject`.
 
@@ -103,14 +119,40 @@ Button("Remover barra acidental") {
 
 ---
 
-## 🏛 Arquitetura (Under the Hood)
+## 🧱 Arquitetura
 
-O pacote utiliza o **Strategy Pattern** gerenciado por um **Factory Pattern**:
-- **`ExerciseTracker`**: (O Contexto). Ele mantém a referência para uma estratégia em tempo real e cuida da atualização reativa para a interface (`@Published`).
-- **`ExerciseStrategy`**: O protocolo base. Ele obriga que todos os exercícios possuam callbacks e as variáveis principais (`count`, `currentMetric`, `isRecording`).
-- **`SitUpStrategy` / `SquatStrategy` / `PushUpStrategy` / `PullUpStrategy`**: As estratégias concretas. Elas instanciam e processam o `CMMotionManager` e avisam o tracker (Main Thread) apenas quando a repetição é computada com sucesso.
+**Strategy** para cada exercício, criado por uma **Factory**:
 
----
+```
+ExerciseTracker (ObservableObject)        ← a View observa count / currentMetric / isRecording
+   │ usa
+   ▼
+ExerciseStrategy (protocolo)              ← start(), stop(), callbacks de repetição
+   ├── PushUpStrategy   ┐
+   ├── SitUpStrategy    │ cada uma lê o CMMotionManager e só avisa
+   ├── SquatStrategy    │ o tracker (na main thread) quando a repetição fecha
+   └── PullUpStrategy   ┘
+ExerciseFactory                           ← ExerciseType → estratégia concreta
+```
+
+```
+Sources/ExercisesPackage/
+├── Core/         ExerciseTracker, ExerciseStrategy, ExerciseType
+├── Strategies/   PushUp, SitUp, Squat, PullUp
+└── Factory/      ExerciseFactory
+```
+
+Adicionar um exercício novo = um `case` em `ExerciseType`, uma estratégia nova e uma linha na
+fábrica. Nada no tracker nem nas Views muda.
+
+## 🗺️ Roadmap
+
+- [x] Flexão, abdominal, agachamento e barra manual
+- [x] Versão 1.0.0 publicada e usada no WatchSport
+- [ ] Testes de unidade das estratégias com amostras de movimento gravadas
+- [ ] Calibração por usuário (limites ajustáveis)
+- [ ] Novos exercícios: polichinelo e burpee
 
 ## 📝 Licença
-Este projeto está sob licença MIT. Sinta-se livre para modificar e contribuir com novos exercícios!
+
+MIT. Veja [`LICENSE`](LICENSE). Contribuições com novos exercícios são bem-vindas!
